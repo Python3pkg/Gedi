@@ -1,8 +1,8 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import numpy as np
 
-
-class Kernel(object):
+class kernel(object):
     """ 
         Definition the kernels and its properties, 
     that includes sum and multiplication of kernels. 
@@ -31,7 +31,7 @@ class Kernel(object):
                                  ", ".join(map(str, self.pars)))
 
                             
-class _operator(Kernel):
+class _operator(kernel):
     """ To allow operations between two kernels """
     def __init__(self, k1, k2):
         self.k1 = k1
@@ -60,7 +60,7 @@ class Product(_operator):
         return self.k1(r) * self.k2(r)
 
 
-class ExpSquared(Kernel):
+class ExpSquared(kernel):
     """
         Definition of the exponential squared kernel and its derivatives,
     it is also know as radial basis function (RBF kernel).
@@ -103,7 +103,7 @@ class ExpSquared(Kernel):
         return f1*(f3/f4)*np.exp(-0.5*f3/f2**2) *f2
    
    
-class ExpSineSquared(Kernel):
+class ExpSineSquared(kernel):
     """
         Definition of the exponential sine squared kernel and its derivatives,
     it is also know as periodic kernel.
@@ -163,7 +163,7 @@ class ExpSineSquared(Kernel):
                 *np.exp((-2.0/f2)*np.sin(f3*f5)**2) 
 
 
-class QuasiPeriodic(Kernel):
+class QuasiPeriodic(kernel):
     """
         Definition of the product between the exponential sine squared kernel 
     and the exponential squared kernel, also known as quasi periodic kernel.
@@ -238,7 +238,7 @@ class QuasiPeriodic(Kernel):
                 *np.exp((-2/f2)*((np.sin(np.pi*f3/f4))**2)-(0.5*f3*f3/ff2))
 
 
-class RatQuadratic(Kernel):
+class RatQuadratic(kernel):
     """
         Definition of the rational quadratic kernel and its derivatives.
     
@@ -294,7 +294,7 @@ class RatQuadratic(Kernel):
         return f1*(func1-np.log(func0))*func0**(-f3) *f3       
     
 
-class WhiteNoise(Kernel):                             
+class WhiteNoise(kernel):                             
     """
         Definition of the white noise kernel and its derivatives.
     
@@ -324,7 +324,7 @@ class WhiteNoise(Kernel):
         return 2*f1*f2      
 
              
-class Exponential(Kernel):
+class Exponential(kernel):
     """
         Definition of the exponential kernel and its derivatives, this kernel
     arise when setting v=1/2 in the matern family of kernels
@@ -366,7 +366,7 @@ class Exponential(Kernel):
         return (f1*f2/f3)*np.exp(-f2/f3)
 
 
-class Matern32(Kernel):
+class Matern32(kernel):
     """
         Definition of the Matern 3/2 kernel and its derivatives, this kernel
     arise when setting v=3/2 in the matern family of kernels
@@ -410,7 +410,7 @@ class Matern32(Kernel):
                 - f3*f1*(f2/f4)*np.exp(-f2/f3)
 
 
-class Matern52(Kernel):
+class Matern52(kernel):
     """
         Definition of the Matern 5/2 kernel and its derivatives, this kernel
     arise when setting v=5/2 in the matern family of kernels
@@ -459,49 +459,35 @@ class Matern52(Kernel):
                 *np.exp(-np.sqrt(5)*f4/f2))                
                 
                 
-class  ExpSineGeorge(Kernel):
-    """
-        Definition of a kernel equal to George's ExpSine2Kernel to test and 
-    compare results
-    
-        Important
-    The derivative its in respect to log(parameter)
-    
-        Parameters
-    P = amplitude of the kernel
-    gamma = 2/(l**2) 
-    """
-    def __init__(self,gamma,P):
-        """
-        Because we are "overwriting" the function __init__
-        we use this weird super function
-        """
-        super(ExpSineGeorge,self).__init__(gamma,P)
-        self.gamma=gamma
-        self.P=P
-        
-    def __call__(self,r):
-        f1=self.gamma
-        f2=self.P
-        f3=r
-        return np.exp(-f1 *  np.sin(np.pi*f3/f2)**2)
- 
-    def de_dgamma(self,r):
-        """ Log-derivative in order to gamma """
-        f1 = self.gamma
-        f2 = self.P
-        f3 = r
-        f4 = -np.sin(np.pi*f3/f2)**2
-        f5 = np.exp(-f1*np.sin(np.pi*f3/f2)**2)  
-        return f4*f5*f1
+    def log_likelihood(self, a, y):
+        """ Calculates the marginal log likelihood
 
-    def de_dp(self,r):
-        """ Log-derivative in order to P """
-        f1 = self.gamma
-        f2 = self.P
-        f3 = r
-        f4 = np.sin(np.pi*f3/f2)
-        f5 = np.cos(np.pi*f3/f2)
-        f6 = np.exp(-f1 *  np.sin(np.pi*f3/f2)**2)
-        return 2*f1*(np.pi*f3/f2)*f4*f5*(f6/f2)*f2
+        Parameters:
+            a = array with the scaling parameters
+            y = values of the dependent variable (the measurements)
 
+        Returns:
+            marginal log likelihood
+        """
+        K = self.compute_matrix(a)
+
+        try:
+            L1 = cho_factor(K)
+            sol = cho_solve(L1, y)
+            n = y.size
+            log_like = - 0.5*np.dot(y, sol) \
+                       - np.sum(np.log(np.diag(L1[0]))) \
+                       - n*0.5*np.log(2*np.pi)        
+        except LinAlgError:
+            return -np.inf
+#            K2=np.linalg.inv(K)
+#            n = y.size
+#            log_like = -0.5* np.dot(np.dot(y.T,K2),y) \
+#                       -np.sum(np.log(np.diag(K))) \
+#                       -n*0.5*np.log(2*np.pi) 
+        return log_like
+
+    def minus_log_likelihood(self, a, y):
+        return - self.log_likelihood(a, y)
+                
+##### END
